@@ -7,3 +7,5 @@ Data and scripts are contained in respective folders
 ## Installation
 
 ## Running the analysis
+
+Navigate to the ´code´ directory and then run ´analysis_01.py´
