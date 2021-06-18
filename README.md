@@ -5,6 +5,21 @@
 Data and scripts are contained in respective folders 
 
 ## Installation
+Python required.
+Install required packages with `pip`:
+
+```
+pip install -r requirements.txt
+```
+
+In addition, install `Brainstat` package:
+
+```
+git clone https://github.com/MICA-MNI/BrainStat.git
+cd BrainStat
+python3 setup.py build
+python3 setup.py install
+```
 
 ## Running the analysis
 
