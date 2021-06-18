@@ -5,14 +5,22 @@
 Data and scripts are contained in respective folders 
 
 ## Installation
-Python required.
-Install required packages with `pip`:
+Python required. Recommended to install and run a virtual environment.
+
+1. Install miniconda
+2. Create new environment and activate environment
+```
+conda create -n mypythonenv python=3.6
+conda activate mypythonenv
+# now install your packages with conda and/or pip and do the analysis
+```
+4. Install required packages with `pip`:
 
 ```
 pip install -r requirements.txt
 ```
 
-In addition, install `Brainstat` package:
+5. In addition, install `Brainstat` package:
 
 ```
 git clone https://github.com/MICA-MNI/BrainStat.git
