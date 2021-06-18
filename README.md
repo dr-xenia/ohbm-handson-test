@@ -1,5 +1,5 @@
 # Content to reproduce paper titled "Hello World"
-
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/dr-xenia/ohbm-handson-test/HEAD)
 ## Content
 
 Data and scripts are contained in respective folders 
