@@ -108,7 +108,7 @@ class ScholarExporter(object):
                               'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
                               'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text,
                               'url': '{}#d=gs_md_cita-d&u=%2F{}'.format(self.url,
-                                                                        quote(paper_soup.find('a')['href'])[1:])}}
+                                                                        quote(paper_soup.find('a',{"data-href":True})['href'])[1:])}}
                 if not this_paper['n_citations']:
                     this_paper['n_citations'] = "0"
 
