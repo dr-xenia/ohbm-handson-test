@@ -99,8 +99,8 @@ class ScholarExporter(object):
             try:
                 citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl'})
                 if citations_a is None:
-                    citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl gsc_a_acm'})
-
+                    #citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl gsc_a_acm'})
+                    print("blub")
                 this_paper = {'title': paper_soup.find('a').text,
                               'year': paper_soup.find_all('span')[-1].text,
                               'n_citations': citations_a.text,
@@ -111,15 +111,17 @@ class ScholarExporter(object):
                                                                         quote(paper_soup.find('a',{"data-href":True})['data-href'])[1:])}
 
                 if not this_paper['n_citations']:
+                    print("no citations")
                     this_paper['n_citations'] = "0"
                     
                 if not this_paper['url']:
+                    print("no url")
                     this_paper['url'] = "0"
 
                 if this_paper['journal'].endswith(', ' + this_paper['year']):
                     this_paper['journal'] = this_paper['journal'][:-len(', ' + this_paper['year'])]
                 self.parsed_papers.append(this_paper)
-            except IndexError:
+            except KeyError:
                 print('Warning: error parsing paper.')
             except IndexError:
                 print('Warning: error parsing paper.')
