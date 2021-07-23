@@ -1,3 +1,18 @@
+# Copyright 2019 Thomas W. Rogers. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
@@ -38,7 +53,7 @@ class ScholarExporter(object):
     def from_user(cls,
                   user: str,
                   page_size: int = 1000,
-                  sort_by: str = 'citations'):  # sort_by='pubdate'
+                  sort_by: str = 'pubdate'):  # sort_by=''
 
         url = 'https://scholar.google.co.uk/citations?' \
               'user={}' \
@@ -91,18 +106,16 @@ class ScholarExporter(object):
                               'n_citations': citations_a.text,
                               'citations_url': citations_a['href'],
                               'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
-                              'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text,
-                              'url': '{}#d=gs_md_cita-d&u=%2F{}'.format(self.url,
-                                                                        quote(paper_soup.find('a')['data-href'])[1:])}
-
+                              'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text}
                 if not this_paper['n_citations']:
                     this_paper['n_citations'] = "0"
 
                 if this_paper['journal'].endswith(', ' + this_paper['year']):
                     this_paper['journal'] = this_paper['journal'][:-len(', ' + this_paper['year'])]
                 self.parsed_papers.append(this_paper)
+            except KeyError:
+                pass
             except IndexError:
                 print('Warning: error parsing paper.')
             except AttributeError:
                 print('Warning: error parsing paper.')
-
