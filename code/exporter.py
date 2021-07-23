@@ -108,7 +108,7 @@ class ScholarExporter(object):
                               'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
                               'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text,
                               'url': '{}#d=gs_md_cita-d&u=%2F{}'.format(self.url,
-            quote(paper_soup.find('a',{"data-href":True})['href'])[1:])}}
+            quote(paper_soup.find('a',{"data-href":True})['href'])[1:])}
             except KeyError:
                 this_paper = {'title': paper_soup.find('a').text,
                               'year': paper_soup.find_all('span')[-1].text,
