@@ -1,219 +1,108 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import quote
+from datetime import date
 
 
-# surface mesh plotting based on coords & triangles only
-def subplot_surf(coords,
-                 tri,
-                 bg_map,
-                 fig,
-                 limits,
-                 subplot_id,
-                 darkness,
-                 alpha,
-                 elev,
-                 azim):
+PAPER_TEMPLATE = """
+<div class="card">
+    <div class="card-publication">
+        <div class="card-body card-body-left">
+            <h4><a href="{url}">{title}</a></h4>
+            <p style="font-style: italic;">by {authors}</p>
+            <p><b>{journal}</b></p>
+        </div>
+    </div>
+    <div class="card-footer">
+        <small class="text-muted">Published in <b>{year}</b> | 
+        <a href="{citations_url}">Citations: <b>{n_citations}</b></a></small>
+    </div>
+</div>
+"""
 
-    ax = fig.add_subplot(subplot_id, projection='3d',
-                         xlim=limits, ylim=limits)
-
-    ax.view_init(elev=elev, azim=azim)
-    ax.set_axis_off()
-    p3dcollec = ax.plot_trisurf(coords[:, 0],
-                                coords[:, 1],
-                                coords[:, 2],
-                                triangles = tri,
-                                linewidth=0.,
-                                antialiased=False)
-
-    face_colors = np.ones((tri.shape[0], 4))
-
-    if bg_map.shape[0] != coords.shape[0]:
-        raise ValueError('The bg_map does not have the same number '
-                         'of vertices as the mesh.')
-    bg_faces = np.mean(bg_map[tri], axis=1)
-    bg_faces = bg_faces - bg_faces.min()
-    bg_faces = bg_faces / bg_faces.max()
-
-    # control background darkness
-    bg_faces *= darkness
-    face_colors = plt.cm.gray_r(bg_faces)
-
-    # modify alpha values of background
-    face_colors[:, 3] = alpha * face_colors[:, 3]
-    p3dcollec.set_facecolors(face_colors)
+INTRO_TEXT = """
+<p>Publications (<b>{total}</b>) last scraped for <a href="{url}">{scholar}</a> on <b>{date}</b> 
+using <a href="https://github.com/TWRogers/google-scholar-export">google-scholar-export</a>.</p>
+"""
 
 
-# surface mesh plotting based on coords & triangles only + surface data on top
-def subplot_surfstat(coords,
-                     tri,
-                     bg_map,
-                     stat_map,
-                     fig,
-                     limits,
-                     subplot_id,
-                     darkness,
-                     alpha,
-                     elev,
-                     azim,
-                     cmap,
-                     vmin,
-                     vmax,
-                     mask,
-                     threshold):
+class ScholarExporter(object):
 
+    def __init__(self, url: str) -> None:  # sort_by='pubdate'
+        self.url = url
+        self.content = None
+        self.parsed_papers = []
+        self.scholar = 'N/A'
 
-    fig.subplots_adjust(wspace=0, hspace=0)
+    @classmethod
+    def from_user(cls,
+                  user: str,
+                  page_size: int = 1000,
+                  sort_by: str = 'citations'):  # sort_by='pubdate'
 
-    ax = fig.add_subplot(subplot_id, projection='3d',
-                         xlim=limits, ylim=limits)
+        url = 'https://scholar.google.co.uk/citations?' \
+              'user={}' \
+              '&pagesize={}' \
+              '&sortby={}'.format(user, page_size, sort_by)
 
-    ax.view_init(elev=elev, azim=azim)
-    ax.set_axis_off()
+        return cls(url)
 
-    if cmap is None:
-        cmap = plt.cm.get_cmap(plt.rcParamsDefault['image.cmap'])
-    else:
-        # if cmap is given as string, translate to matplotlib cmap
-        cmap = plt.cm.get_cmap(cmap)
+    def export(self,
+               html_path: str,
+               paper_template: str = None) -> None:
 
-    p3dcollec = ax.plot_trisurf(coords[:, 0],
-                                coords[:, 1],
-                                coords[:, 2],
-                                triangles = tri,
-                                linewidth=0.,
-                                antialiased = False)
-    if mask is not None:
-        cmask = np.zeros(len(coords))
-        cmask[mask] = 1
-        cutoff = 2
-        fmask = np.where(cmask[tri].sum(axis=1) > cutoff)[0]
+        self._get_and_check_response()
+        self._parse_contents()
+        if paper_template is None:
+            paper_template = PAPER_TEMPLATE
 
-    if bg_map is not None or surf_map is not None:
-        face_colors = np.ones((tri.shape[0], 4))
-        if bg_map is not None:
-            if bg_map.shape[0] != coords.shape[0]:
-                raise ValueError('The bg_map does not have the same number '
-                                 'of vertices as the mesh.')
-            bg_faces = np.mean(bg_map[tri], axis=1)
-            bg_faces = bg_faces - bg_faces.min()
-            bg_faces = bg_faces / bg_faces.max()
-            # control background darkness
-            bg_faces *= darkness
-            face_colors = plt.cm.gray_r(bg_faces)
-        # modify alpha values of background
-        face_colors[:, 3] = alpha * face_colors[:, 3]
+        with open(html_path, 'w') as html_file:
+            html_file.write(INTRO_TEXT.format(scholar=self.scholar,
+                                              total=len(self.parsed_papers),
+                                              url=self.url,
+                                              date=date.today().isoformat()))
 
+            for paper in self.parsed_papers:
+                html_file.write(paper_template.format(**paper))
 
-        if len(stat_map.shape) is not 1:
-            raise ValueError('stat_map can only have one dimension but has'
-                             '%i dimensions' % len(stat_map_data.shape))
-        if stat_map.shape[0] != coords.shape[0]:
-            raise ValueError('The stat_map does not have the same number '
-                             'of vertices as the mesh.')
-
-        # create face values from vertex values by mean (can also be median ;)
-        stat_map_faces = np.mean(stat_map[tri], axis=1)
-
-        if vmin is None:
-            vmin = np.nanmin(stat_map_faces)
-        if vmax is None:
-            vmax = np.nanmax(stat_map_faces)
-
-        # treshold if inidcated
-        if threshold is None:
-            kept_indices = np.where(stat_map_faces)[0]
+    def _get_and_check_response(self) -> None:
+        r = requests.get(self.url)
+        if r.status_code == 200:
+            self.content = r.content
         else:
-            kept_indices = np.where(np.abs(stat_map_faces) >= threshold)[0]
+            raise ConnectionError('Received {} status code for url {}.'
+                                  'Please check that the url is valid'
+                                  'and that you have internet connection.'.format(r.status_code,
+                                                                                  self.url))
 
-        stat_map_faces = stat_map_faces - vmin
-        stat_map_faces = stat_map_faces / (vmax - vmin)
+    def _parse_contents(self) -> None:
+        parser = BeautifulSoup(self.content, features="html.parser")
+        self.scholar = parser.find('div', {'id': 'gsc_prf_in'}).text
+        papers = parser.body.find_all('tr', attrs={'class': 'gsc_a_tr'})
+        for paper in papers:
+            paper_soup = BeautifulSoup(str(paper), features="html.parser")
+            try:
+                citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl'})
+                if citations_a is None:
+                    citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl gsc_a_acm'})
 
-        if mask is None:
-            face_colors[kept_indices] = cmap(stat_map_faces[kept_indices])
-        else:
-            face_colors[fmask] = cmap(stat_map_faces)[fmask] * face_colors[fmask]
+                this_paper = {'title': paper_soup.find('a').text,
+                              'year': paper_soup.find_all('span')[-1].text,
+                              'n_citations': citations_a.text,
+                              'citations_url': citations_a['href'],
+                              'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
+                              'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text,
+                              'url': '{}#d=gs_md_cita-d&u=%2F{}'.format(self.url,
+                                                                        quote(paper_soup.find('a')['data-href'])[1:])}
 
-    p3dcollec.set_facecolors(face_colors)
+                if not this_paper['n_citations']:
+                    this_paper['n_citations'] = "0"
 
-
-def plot_surfstat(surf_mesh,
-                  bg_map,
-                  stat_map = None,
-                  figsize = None,
-                  darkness = None,
-                  alpha = 1,
-                  cmap = None,
-                  vmin = None,
-                  vmax = None,
-                  mask = None,
-                  threshold = None):
-
-    coords = surf_mesh['coords']
-    tri    = surf_mesh['tri']
-
-    if stat_map is None:
-        limits = [-70, 50]
-        if figsize is None:
-            figsize = (18,5)
-        if darkness is None:
-            darkness = 0.65
-
-    else :
-        limits = [-80, 50]
-        if darkness is None:
-            darkness = 0.3
-        if figsize is None:
-            figsize = (18,5)
-
-    fig = plt.figure(figsize = figsize)
-
-    lenCorL = int(len(coords)/2)
-    lenTriL = int(len(tri)/2)
-
-    if stat_map is None:
-        # plot left hemisphere (lateral & medial)
-        subplot_surf(coords[0:lenCorL,:], tri[0:lenTriL,:], bg_map[0:lenCorL],
-                     fig, limits, 141, darkness, alpha, elev = 0, azim=180)
-
-        subplot_surf(coords[0:lenCorL,:], tri[0:lenTriL,:], bg_map[0:lenCorL],
-                     fig, limits, 142, darkness, alpha, elev = 0, azim=0)
-
-        # plot right hemisphere (medial & lateral)
-        subplot_surf(coords[lenCorL:,:], tri[lenTriL:,:], bg_map[lenCorL:],
-                     fig, limits, 143, darkness, alpha, elev = 0, azim=180)
-
-        subplot_surf(coords[lenCorL:,:], tri[lenTriL:,:], bg_map[lenCorL:],
-                     fig, limits, 144, darkness, alpha, elev = 0, azim=0)
-
-    else:
-        if mask is None:
-            mask_l = mask_r = mask
-        else:
-            mask_l = mask[np.where(mask < lenCorL)]
-            mask_r = mask[np.where(mask >= lenCorL)] - lenCorL
-
-        subplot_surfstat(coords[0:lenCorL,:], tri[0:lenTriL,:], bg_map[0:lenCorL],
-                         stat_map[0:lenCorL], fig, limits, 141, darkness, alpha,
-                         elev=0, azim=180, mask = mask_l,
-                         cmap = cmap, vmin = vmin, vmax = vmax, threshold = threshold)
-
-        subplot_surfstat(coords[0:lenCorL,:], tri[0:lenTriL,:], bg_map[0:lenCorL],
-                         stat_map[0:lenCorL], fig, limits, 142, darkness, alpha,
-                         elev=0, azim = 0, mask = mask_l,
-                         cmap = cmap, vmin = vmin, vmax = vmax, threshold = threshold)
-
-        subplot_surfstat(coords[lenCorL:,:], tri[lenTriL:,:], bg_map[lenCorL:],
-                         stat_map[lenCorL:], fig, limits, 143, darkness, alpha,
-                         elev=0, azim = 180, mask = mask_r,
-                         cmap = cmap, vmin = vmin, vmax = vmax, threshold = threshold)
-
-        subplot_surfstat(coords[lenCorL:,:], tri[lenTriL:,:], bg_map[lenCorL:],
-                         stat_map[lenCorL:], fig, limits, 144, darkness, alpha,
-                         elev=0, azim = 0, mask = mask_r,
-                         cmap = cmap, vmin = vmin, vmax = vmax, threshold = threshold)
-
-
-    return fig
-
+                if this_paper['journal'].endswith(', ' + this_paper['year']):
+                    this_paper['journal'] = this_paper['journal'][:-len(', ' + this_paper['year'])]
+                self.parsed_papers.append(this_paper)
+            except IndexError:
+                print('Warning: error parsing paper.')
+            except AttributeError:
+                print('Warning: error parsing paper.')
 
