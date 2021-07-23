@@ -53,7 +53,7 @@ class ScholarExporter(object):
     def from_user(cls,
                   user: str,
                   page_size: int = 1000,
-                  sort_by: str = 'pubdate'):  # sort_by=''
+                  sort_by: str = 'pubdate'):  # sort_by='pubdate'
 
         url = 'https://scholar.google.co.uk/citations?' \
               'user={}' \
@@ -100,7 +100,7 @@ class ScholarExporter(object):
                 citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl'})
                 if citations_a is None:
                     citations_a = paper_soup.find('a', {'class': 'gsc_a_ac gs_ibl gsc_a_acm'})
-            try:
+
                 this_paper = {'title': paper_soup.find('a').text,
                               'year': paper_soup.find_all('span')[-1].text,
                               'n_citations': citations_a.text,
@@ -108,21 +108,19 @@ class ScholarExporter(object):
                               'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
                               'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text,
                               'url': '{}#d=gs_md_cita-d&u=%2F{}'.format(self.url,
-            quote(paper_soup.find('a',{"data-href":True})['href'])[1:])}
-            except KeyError:
-                this_paper = {'title': paper_soup.find('a').text,
-                              'year': paper_soup.find_all('span')[-1].text,
-                              'n_citations': citations_a.text,
-                              'citations_url': citations_a['href'],
-                              'authors': paper_soup.find_all('div', {'class': 'gs_gray'})[0].text,
-                              'journal': paper_soup.find_all('div', {'class': 'gs_gray'})[1].text}                                                        
+                                                                        quote(paper_soup.find('a',{"data-href":True})['data-href'])[1:])}
+
                 if not this_paper['n_citations']:
                     this_paper['n_citations'] = "0"
+                    
+                if not this_paper['url']:
+                    this_paper['url'] = "0"
 
                 if this_paper['journal'].endswith(', ' + this_paper['year']):
                     this_paper['journal'] = this_paper['journal'][:-len(', ' + this_paper['year'])]
                 self.parsed_papers.append(this_paper)
-
+            except IndexError:
+                print('Warning: error parsing paper.')
             except IndexError:
                 print('Warning: error parsing paper.')
             except AttributeError:
